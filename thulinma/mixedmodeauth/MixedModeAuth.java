@@ -244,7 +244,7 @@ public class MixedModeAuth extends JavaPlugin {
   }
 
   @SuppressWarnings("unchecked") //prevent eclipse whining about data.add()
-  
+
   private void saveUsers() {
     File file = new File(getDataFolder(), "users.json");
     JSONArray data = new JSONArray();
@@ -259,7 +259,7 @@ public class MixedModeAuth extends JavaPlugin {
       log.severe("[MixedModeAuth] Error writing users to file!");
     }
   }
-  
+
   @SuppressWarnings("unchecked") //Prevent warnings about user.put()
   private void newUser(String name, String pass){
     JSONObject user = new JSONObject();
@@ -271,19 +271,19 @@ public class MixedModeAuth extends JavaPlugin {
 
   private void delUser(String name){
     if (isUser(name)){
-    users.remove(name);
-    saveUsers();
+      users.remove(name);
+      saveUsers();
     }
   }
 
   public Boolean isUser(String name){
     return users.containsKey(name);
   }
-  
+
   private Boolean authUser(String name, String pass){
     if (!isUser(name)){return false;}
     String upass = (String) users.get(name).get("pass");
     return upass.equals(pass);
   }
-  
+
 }

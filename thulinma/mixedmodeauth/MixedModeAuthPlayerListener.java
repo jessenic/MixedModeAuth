@@ -22,9 +22,9 @@ import org.bukkit.event.player.PlayerPickupItemEvent;
  * @author Thulinma
  */
 public class MixedModeAuthPlayerListener extends PlayerListener {
-	public static MixedModeAuth plugin;
-	
-	private void setPlayerGuest(Player player){
+  public static MixedModeAuth plugin;
+
+  private void setPlayerGuest(Player player){
     player.sendMessage("You are currently a guest, and cannot play until you login to your account.");
     player.sendMessage("Use /auth <username> <password> to login.");
     // rename to player_entID to prevent people kicking each other off
@@ -36,34 +36,34 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
     //teleport to default spawn loc
     player.teleport(player.getWorld().getSpawnLocation());	  
     plugin.log.info("[MixedModeAuth] Nonpremium user has been asked to login.");
-	}
+  }
 
-	/**
-	 * @param authPlayer
-	 */
-	public MixedModeAuthPlayerListener(MixedModeAuth instance) {
-		plugin = instance;
-	}
+  /**
+   * @param authPlayer
+   */
+  public MixedModeAuthPlayerListener(MixedModeAuth instance) {
+    plugin = instance;
+  }
 
-	public void onPlayerJoin(PlayerJoinEvent event) {
-		Player player = event.getPlayer();
-		String name = player.getName();
+  public void onPlayerJoin(PlayerJoinEvent event) {
+    Player player = event.getPlayer();
+    String name = player.getName();
 
     if (name.substring(0, 6).equalsIgnoreCase("Player")) {
       setPlayerGuest(player);
-		} else {
+    } else {
       // Check if player is real player, first...
-		  String inputLine = "";
-		  try{
-		    URL mcheck = new URL("http://www.minecraft.net/game/checkserver.jsp?premium="+name);
-		    URLConnection mcheckc = mcheck.openConnection();
-		    mcheckc.setReadTimeout(1500);
-		    BufferedReader in = new BufferedReader(new InputStreamReader(mcheckc.getInputStream()));
-		    inputLine = in.readLine();
-		    in.close();
-		  } catch(Exception e){
-		    plugin.log.info("[MixedModeAuth] Premium check error, assuming nonpremium: "+e.getMessage());
-		  }
+      String inputLine = "";
+      try{
+        URL mcheck = new URL("http://www.minecraft.net/game/checkserver.jsp?premium="+name);
+        URLConnection mcheckc = mcheck.openConnection();
+        mcheckc.setReadTimeout(1500);
+        BufferedReader in = new BufferedReader(new InputStreamReader(mcheckc.getInputStream()));
+        inputLine = in.readLine();
+        in.close();
+      } catch(Exception e){
+        plugin.log.info("[MixedModeAuth] Premium check error, assuming nonpremium: "+e.getMessage());
+      }
       if (inputLine.equals("PREMIUM")){
         // [?] Tell real players to enter themselves into the AuthDB
         if (!plugin.isUser(name)) {
@@ -77,23 +77,23 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
       } else {
         setPlayerGuest(player);
       }
-		}
-	}
+    }
+  }
 
-	public void onPlayerInteract(PlayerInteractEvent event){
-		Player player = event.getPlayer();
-		if (plugin.getAuthDatabase().get(player.getName()) == null) {
-			event.setCancelled(true);
-      player.sendMessage("You cannot play until you have an active account.");
-		}
-	}
-	
-	public void onPlayerPickupItem(PlayerPickupItemEvent event){
+  public void onPlayerInteract(PlayerInteractEvent event){
     Player player = event.getPlayer();
-    if (plugin.getAuthDatabase().get(player.getName()) == null) {
+    if (!plugin.isUser(player.getName())) {
       event.setCancelled(true);
       player.sendMessage("You cannot play until you have an active account.");
     }
   }
-	
+
+  public void onPlayerPickupItem(PlayerPickupItemEvent event){
+    Player player = event.getPlayer();
+    if (!plugin.isUser(player.getName())) {
+      event.setCancelled(true);
+      player.sendMessage("You cannot play until you have an active account.");
+    }
+  }
+
 }

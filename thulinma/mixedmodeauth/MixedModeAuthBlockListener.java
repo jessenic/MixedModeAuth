@@ -12,17 +12,17 @@ import org.bukkit.event.block.BlockListener;
  * @author Thulinma
  */
 public class MixedModeAuthBlockListener extends BlockListener {
-	public static MixedModeAuth plugin;
-	
-	public MixedModeAuthBlockListener(MixedModeAuth instance) {
-		plugin = instance;
-	}
-	
-	public void onBlockBreak(BlockBreakEvent event) {
-		Player player = event.getPlayer();
-		if (plugin.getAuthDatabase().get(player.getName()) == null) {
-			event.setCancelled(true);
-			player.sendMessage("You cannot play until you have an active account.");
-		}
-	}
+  public static MixedModeAuth plugin;
+
+  public MixedModeAuthBlockListener(MixedModeAuth instance) {
+    plugin = instance;
+  }
+
+  public void onBlockBreak(BlockBreakEvent event) {
+    Player player = event.getPlayer();
+    if (plugin.isUser(player.getName())) {
+      event.setCancelled(true);
+      player.sendMessage("You cannot play until you have an active account.");
+    }
+  }
 }
