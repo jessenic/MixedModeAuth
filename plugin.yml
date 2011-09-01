@@ -1,12 +1,12 @@
-name: AuthPlayer
-main: archangel.authplayer.AuthPlayer
-version: 1.2
-description: Provides alternate login when minecraft.net login servers are down.
-authors: [Arcalyth, Thulinma]
+name: MixedModeAuth
+main: thulinma.mixedmodeauth.MixedModeAuth
+version: 1.0.2
+description: Provides a mixed mode between offline and online server modes - allowing for fully secured servers that work both with and without a valid minecraft login.
+authors: [Thulinma]
 
 commands:
     auth:
-        description: AuthPlayer account maintenance command.
+        description: MixedModeAuth account maintenance command.
         usage: |
             /auth <username> <password> - Log into or create an account (as guest).
             /auth <password> - Create an account (as premium user).

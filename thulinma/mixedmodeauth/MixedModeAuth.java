@@ -1,10 +1,16 @@
 /**
- * AuthPlayer: AuthPlayer.java
- * @author Alex Riebs
- * Created Jul 6, 2011
+ * MixedModeAuth: MixedModeAuth.java
  */
-package archangel.authplayer;
+package thulinma.mixedmodeauth;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.logging.Logger;
 
 import net.minecraft.server.EntityPlayer;
@@ -18,40 +24,30 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
-
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 import com.nijiko.permissions.PermissionHandler;
 import com.nijikokun.bukkit.Permissions.Permissions;
 
 /**
- * @author Alex "Arcalyth" Riebs
- * License: Don't steal my shit. Give credit if you modify and/or redistribute any of my code.
- * Otherwise, you're free to do whatever else you want with it.
- * Also, the Bukkit license applies.
- * 
+ * @author Alex "Arcalyth" Riebs (original code)
  * @author Thulinma
- * Edited original work by Arclyth so it actually works as advertised.
- * Also added an item pickup disabler for unauthed users.
  */
-public class AuthPlayer extends JavaPlugin {
+public class MixedModeAuth extends JavaPlugin {
   Logger log = Logger.getLogger("Minecraft");
-  private final AuthPlayerPlayerListener playerListener = new AuthPlayerPlayerListener(this);
-  private final AuthPlayerBlockListener blockListener = new AuthPlayerBlockListener(this);
+  private final MixedModeAuthPlayerListener playerListener = new MixedModeAuthPlayerListener(this);
+  private final MixedModeAuthBlockListener blockListener = new MixedModeAuthBlockListener(this);
 
-  private AuthDatabase db;
+  private HashMap<String, JSONObject> users = new HashMap<String, JSONObject>();
   private PermissionHandler permissions;
 
-  /*
-   * @see org.bukkit.plugin.Plugin#onDisable()
-   */
   @Override
   public void onDisable() {
     PluginDescriptionFile pdfFile = getDescription();
-    log.info("AuthPlayer "+pdfFile.getVersion()+" disabled.");
+    log.info("[MixedModeAuth] "+pdfFile.getVersion()+" disabled.");
   }
 
-  /*
-   * @see org.bukkit.plugin.Plugin#onEnable()
-   */
   @Override
   public void onEnable() {
     PluginManager pm = this.getServer().getPluginManager();
@@ -60,11 +56,11 @@ public class AuthPlayer extends JavaPlugin {
     pm.registerEvent(Event.Type.PLAYER_INTERACT, playerListener, Event.Priority.High, this);
     pm.registerEvent(Event.Type.BLOCK_BREAK, blockListener, Event.Priority.High, this);
 
-    db = new AuthDatabase(this);
+    loadUsers();
+    setupPermissions();
 
     PluginDescriptionFile pdfFile = getDescription();
-    log.info("AuthPlayer "+pdfFile.getVersion()+" enabled.");
-    setupPermissions();
+    log.info("[MixedModeAuth] "+pdfFile.getVersion()+" enabled.");
   }
 
   public boolean onCommand(CommandSender sender, Command cmd, String commandLabel, String[] args) {
@@ -76,23 +72,14 @@ public class AuthPlayer extends JavaPlugin {
         return true;
       }
 
-      if (args[0].equals("list")){
-        if (hasPermission((Player)sender, "authplayer.list")){
-          sender.sendMessage("Registered players: \n" + getAuthDatabase().toString());
-        }else{
-          sender.sendMessage("You do not have permission to get the registered players list.");
-        }
-        return true;
-      }
-
       if (args[0].equals("del") || args[0].equals("delete")){
-        if (hasPermission((Player)sender, "authplayer.delete")){
-          if (args.length <= 2){
+        if (hasPermission((Player)sender, "mixedmodeauth.delete")){
+          if (args.length < 2){
             sender.sendMessage("Usage: /auth delete <username>");
             return true;
           }
-          if (getAuthDatabase().get(args[1]) != null){
-            getAuthDatabase().delete(args[1]);
+          if (isUser(args[1])){
+            delUser(args[1]);
             sender.sendMessage("User "+args[1]+" deleted from registered users.");
           }else{
             sender.sendMessage("There is no such registered user: "+args[1]);
@@ -104,15 +91,15 @@ public class AuthPlayer extends JavaPlugin {
       }
 
       if (args[0].equals("pass") || args[0].equals("password") || args[0].equals("passwd")){
-        if (hasPermission((Player)sender, "authplayer.passwd")){
-          if (args.length <= 2){
+        if (hasPermission((Player)sender, "mixedmodeauth.passwd")){
+          if (args.length < 2){
             sender.sendMessage("Usage: /auth password <new password>");
             return true;
           }
           String user = ((Player)sender).getName();
-          if (getAuthDatabase().get(user) != null){
-            getAuthDatabase().delete(args[1]);
-            getAuthDatabase().add(user, new AuthInfo((Player)sender, args[1]));
+          if (isUser(user)){
+            delUser(user);
+            newUser(user, args[1]);
             sender.sendMessage("Your password has been changed.");
           }else{
             sender.sendMessage("You are not currently logged in!");
@@ -124,13 +111,13 @@ public class AuthPlayer extends JavaPlugin {
       }
 
       if (args[0].equals("create") || args[0].equals("new") || args[0].equals("newaccount") || args[0].equals("createaccount")){
-        if (hasPermission((Player)sender, "authplayer.create")){
-          if (args.length <= 3){
+        if (hasPermission((Player)sender, "mixedmodeauth.create")){
+          if (args.length < 3){
             sender.sendMessage("Usage: /auth create <new username> <new password>");
             return true;
           }
-          if (getAuthDatabase().get(args[1]) == null){
-            getAuthDatabase().add(args[1], new AuthInfo((Player)sender, args[2]));
+          if (!isUser(args[1])){
+            newUser(args[1], args[2]);
             sender.sendMessage("New account created with name "+args[1]);
           }else{
             sender.sendMessage("This account already exists!");
@@ -152,15 +139,13 @@ public class AuthPlayer extends JavaPlugin {
     Player player = (Player)sender;
     String username = player.getName();
 
-    AuthDatabase db = getAuthDatabase();
-
     // [?] Catch people that already have a name
     if (!username.substring(0, 6).equalsIgnoreCase("Player")) {
       // [?] Already have a name, and already in the db? Must be premium or already authenticated.
-      if (db.get(username) != null) {
+      if (isUser(username)) {
         player.sendMessage("You are already logged in!");
       } else {
-        db.add(username, new AuthInfo(player, args[0]));
+        newUser(username, args[0]);
         player.sendMessage("Password saved! You can now play.");
       }
       return true;
@@ -180,11 +165,11 @@ public class AuthPlayer extends JavaPlugin {
       }
 
       // [?] Does the player exist on the server?
-      if (db.get(loginName) == null) {
-        if (hasPermission((Player)sender, "authplayer.create")){
-          db.add(loginName, new AuthInfo(player, password));
+      if (!isUser(loginName)) {
+        if (hasPermission((Player)sender, "mixedmodeauth.create")){
+          newUser(loginName, password);
           player.sendMessage("You have registered the name " + loginName + ". Use /auth again to authenticate.");
-          log.info("AuthPlayer: New user " + loginName + " created");
+          log.info("[MixedModeAuth] New user " + loginName + " created");
         }else{
           player.sendMessage("You are not allowed to create new accounts.");
           player.sendMessage("To create a new account: login to this server using your minecraft account, or ask an admin to create one for you.");
@@ -196,8 +181,7 @@ public class AuthPlayer extends JavaPlugin {
           player.sendMessage("Someone is already playing as " + loginName + "!");
         else {
           // [?] Player isn't currently playing, so authenticate.
-          AuthInfo info = db.get(loginName);
-          if (info.authenticate(password)) {
+          if (authUser(loginName, password)) {
             EntityPlayer entity = ((CraftPlayer)player).getHandle();
             entity.name = loginName;
             entity.displayName = entity.name;
@@ -206,7 +190,7 @@ public class AuthPlayer extends JavaPlugin {
             player.teleport(player);
 
             player.sendMessage("You are now logged in. Welcome, " + entity.name + "!");
-            log.info("AuthPlayer: " + entity.name + " identified via /auth");
+            log.info("[MixedModeAuth] " + entity.name + " identified via /auth");
           } else {
             player.sendMessage("Wrong username or password. Try again.");
           }
@@ -217,10 +201,6 @@ public class AuthPlayer extends JavaPlugin {
     return true;
   }
 
-  public AuthDatabase getAuthDatabase() {
-    return db;
-  }
-
   private void setupPermissions() {
     Plugin test = this.getServer().getPluginManager().getPlugin("Permissions");
 
@@ -228,14 +208,14 @@ public class AuthPlayer extends JavaPlugin {
       if (test != null) {
         permissions = ((Permissions) test).getHandler();
       } else {
-        log.info("[AuthPlayer] Permission system not detected, allowing everything for operators only");
+        log.info("[MixedModeAuth] Permission system not detected, falling back to defaults.");
       }
     }
   }
 
   private boolean hasPermission(Player player, String node) {
     if(permissions == null) {
-      if (node.equals("authplayer.passwd")){
+      if (node.equals("mixedmodeauth.passwd")){
         return true; 
       }else{
         return player.isOp();
@@ -245,5 +225,65 @@ public class AuthPlayer extends JavaPlugin {
     }
   }
 
+  private void loadUsers() {
+    JSONParser parser = new JSONParser();
+    try {
+      File file = new File(getDataFolder(), "users.json");
+      BufferedReader reader = new BufferedReader(new FileReader(file));
+      JSONArray data = (JSONArray) parser.parse(reader);
+      for (Object obj : data) {
+        JSONObject user = (JSONObject) obj;
+        users.put((String) user.get("name"), user);
+      }
+      reader.close();
+    } catch (FileNotFoundException ex) {
+      // Assume empty markers file
+    } catch (Exception ex) {
+      log.severe("[MixedModeAuth] Error reading users from file: "+ex.getMessage());
+    }
+  }
 
+  @SuppressWarnings("unchecked") //prevent eclipse whining about data.add()
+  
+  private void saveUsers() {
+    File file = new File(getDataFolder(), "users.json");
+    JSONArray data = new JSONArray();
+    for (JSONObject user : users.values()) {
+      data.add(user);
+    }
+    try {
+      BufferedWriter writer = new BufferedWriter(new FileWriter(file));
+      writer.write(data.toString());
+      writer.close();
+    } catch (IOException e) {
+      log.severe("[MixedModeAuth] Error writing users to file!");
+    }
+  }
+  
+  @SuppressWarnings("unchecked") //Prevent warnings about user.put()
+  private void newUser(String name, String pass){
+    JSONObject user = new JSONObject();
+    user.put("name", name);
+    user.put("pass", pass);
+    users.put(name, user);
+    saveUsers();
+  }
+
+  private void delUser(String name){
+    if (isUser(name)){
+    users.remove(name);
+    saveUsers();
+    }
+  }
+
+  public Boolean isUser(String name){
+    return users.containsKey(name);
+  }
+  
+  private Boolean authUser(String name, String pass){
+    if (!isUser(name)){return false;}
+    String upass = (String) users.get(name).get("pass");
+    return upass.equals(pass);
+  }
+  
 }

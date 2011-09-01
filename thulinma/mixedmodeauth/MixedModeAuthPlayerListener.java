@@ -1,9 +1,7 @@
 /**
- * AuthPlayer: AuthPlayerPlayerListener.java
- * @author Alex Riebs
- * Created Jul 6, 2011
+ * MixedModeAuth: MixedModeAuthPlayerListener.java
  */
-package archangel.authplayer;
+package thulinma.mixedmodeauth;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -20,17 +18,11 @@ import org.bukkit.event.player.PlayerListener;
 import org.bukkit.event.player.PlayerPickupItemEvent;
 
 /**
- * @author Alex "Arcalyth" Riebs
- * License: Don't steal my shit. Give credit if you modify and/or redistribute any of my code.
- * Otherwise, you're free to do whatever else you want with it.
- * Also, the Bukkit license applies.
- * 
+ * @author Alex "Arcalyth" Riebs (original code)
  * @author Thulinma
- * Edited original work by Arclyth so it actually works as advertised.
- * Also added an item pickup disabler for unauthed users.
  */
-public class AuthPlayerPlayerListener extends PlayerListener {
-	public static AuthPlayer plugin;
+public class MixedModeAuthPlayerListener extends PlayerListener {
+	public static MixedModeAuth plugin;
 	
 	private void setPlayerGuest(Player player){
     player.sendMessage("You are currently a guest, and cannot play until you login to your account.");
@@ -43,13 +35,13 @@ public class AuthPlayerPlayerListener extends PlayerListener {
     player.getInventory().clear();
     //teleport to default spawn loc
     player.teleport(player.getWorld().getSpawnLocation());	  
-    plugin.log.info("AuthPlayer: Nonpremium user has been asked to login.");
+    plugin.log.info("[MixedModeAuth] Nonpremium user has been asked to login.");
 	}
 
 	/**
 	 * @param authPlayer
 	 */
-	public AuthPlayerPlayerListener(AuthPlayer instance) {
+	public MixedModeAuthPlayerListener(MixedModeAuth instance) {
 		plugin = instance;
 	}
 
@@ -70,17 +62,17 @@ public class AuthPlayerPlayerListener extends PlayerListener {
 		    inputLine = in.readLine();
 		    in.close();
 		  } catch(Exception e){
-		    plugin.log.info("AuthPlayer: Premium check error, assuming nonpremium: "+e.getMessage());
+		    plugin.log.info("[MixedModeAuth] Premium check error, assuming nonpremium: "+e.getMessage());
 		  }
       if (inputLine.equals("PREMIUM")){
         // [?] Tell real players to enter themselves into the AuthDB
-        if (plugin.getAuthDatabase().get(name) == null) {
+        if (!plugin.isUser(name)) {
           player.sendMessage("Welcome, " + name + "! It appears this is your first time playing on this server.");
           player.sendMessage("Please create a password for your account by typing /auth <password>");
           player.sendMessage("This will allow you to play even if minecraft login servers are down.");
           player.sendMessage("The server admin can see what you pick as password so don't use the same password as your Minecraft account!");
         } else {
-          plugin.log.info("AuthPlayer: Premium user " + name + " auto-identified.");
+          plugin.log.info("[MixedModeAuth] Premium user " + name + " auto-identified.");
         }
       } else {
         setPlayerGuest(player);
@@ -92,7 +84,7 @@ public class AuthPlayerPlayerListener extends PlayerListener {
 		Player player = event.getPlayer();
 		if (plugin.getAuthDatabase().get(player.getName()) == null) {
 			event.setCancelled(true);
-			player.sendMessage("You cannot play until you are authenticated.");
+      player.sendMessage("You cannot play until you have an active account.");
 		}
 	}
 	
@@ -100,7 +92,7 @@ public class AuthPlayerPlayerListener extends PlayerListener {
     Player player = event.getPlayer();
     if (plugin.getAuthDatabase().get(player.getName()) == null) {
       event.setCancelled(true);
-      player.sendMessage("You cannot play until you are authenticated.");
+      player.sendMessage("You cannot play until you have an active account.");
     }
   }
 	
