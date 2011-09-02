@@ -252,11 +252,12 @@ public class MixedModeAuth extends JavaPlugin {
       data.add(user);
     }
     try {
+      getDataFolder().mkdirs();
       BufferedWriter writer = new BufferedWriter(new FileWriter(file));
       writer.write(data.toString());
       writer.close();
     } catch (IOException e) {
-      log.severe("[MixedModeAuth] Error writing users to file!");
+      log.severe("[MixedModeAuth] Error writing users to file: "+e.getMessage());
     }
   }
 
