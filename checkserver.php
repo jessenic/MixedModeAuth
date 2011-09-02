@@ -1,7 +1,7 @@
 <?
 //Rerouting Auth script, PHP version
 //By Thulinma, Sep 1 2011
-//License: Do what you want with it, but give me credit for at least the concept.
+//BSD License
 //
 //Description:
 //Changes the reply to the server from miencraft to always be "YES", allowing all users to login.
@@ -34,7 +34,7 @@ $HTTP["host"] =~ "(^|\.)minecraft.net$" {
 //You can add your own login server here or some other - I don't know how many exist.
 //If you do not want to accept mineshafter logins, simply remove it here from the array.
 //These servers will be checked in the order you put them in.
-$servers = Array("http://minecraft.net/game/checkserver.jsp", "http://mineshafter.appspot.com/game/checkserver.jsp");
+$servers = Array("http://session.minecraft.net/game/checkserver.jsp", "http://mineshafter.appspot.com/game/checkserver.jsp");
 
 
 
@@ -42,18 +42,14 @@ $servers = Array("http://minecraft.net/game/checkserver.jsp", "http://mineshafte
 
 
 //Load the current waitinglist.
-$log = json_decode(file_get_contents("logins.json"));
+$log = json_decode(file_get_contents("logins.json"), true);
 
 //Check a user in the waitinglist
 if ($_REQUEST['premium']){
-  foreach ($log AS $num => $entry){
-    if ($entry->user == $_REQUEST['premium']){
-      if ($entry->authed == "YES"){echo "PREMIUM";}else{echo "NOTPREMIUM";}
-      unset($log[$num]);//remove the user from the waitinglist
-      file_put_contents("logins.json", json_encode($log));
-      die();
-    }
-  }
+  if ($log[$_REQUEST['premium']] == "YES"){echo "PREMIUM";}else{echo "NOTPREMIUM";}
+  unset($log[$_REQUEST['premium']]);//remove the user from the waitinglist
+  file_put_contents("logins.json", json_encode($log));
+  die();
   //not found? return the save answer (not premium) by default
   die("NOTPREMIUM");
 }
@@ -67,14 +63,15 @@ if (!$_REQUEST['user'] && !$_REQUEST['serverId']){
   }
 }
 
-$newvalue = Array("user" => $_REQUEST['user'], "authed" => "NO");
+$log[$_REQUEST['user']] = "NO";
 
 //check all servers
+$_REQUEST['random'] = rand(1, 10000);
 foreach ($servers AS $currserv){
   $response = file_get_contents($currserv."?user=".$_REQUEST['user']."&serverId=".$_REQUEST['serverId']);
+  file_put_contents("log.txt", "Checking: ".json_encode(Array("server" => $currserv, "response" => $response))."\n", FILE_APPEND);
   if ($response == "YES"){
-    $newvalue->authed = "YES";
-    $log[] = $newvalue;
+    $log[$_REQUEST['user']] = "YES";
     file_put_contents("logins.json", json_encode($log));
     //Return yes after a correct login is found.
     die("YES");
@@ -82,7 +79,6 @@ foreach ($servers AS $currserv){
 }
 
 //Store the failed auth.
-$log[] = $newvalue;
 file_put_contents("logins.json", json_encode($log));
 //Always return yes to the server - a plugin will further check it.
 die("YES");
