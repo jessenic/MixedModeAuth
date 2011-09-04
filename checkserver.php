@@ -1,7 +1,7 @@
 <?
 //Rerouting Auth script, PHP version
 //By Thulinma, Sep 1 2011
-//BSD License
+//License: Do what you want with it, but give me credit for at least the concept.
 //
 //Description:
 //Changes the reply to the server from miencraft to always be "YES", allowing all users to login.
@@ -65,10 +65,13 @@ if (!$_REQUEST['user'] && !$_REQUEST['serverId']){
 
 $log[$_REQUEST['user']] = "NO";
 
+//create stream context with 2-second timeout
+$context = stream_context_create(array('http' => array('timeout' => 2)));
+
 //check all servers
 $_REQUEST['random'] = rand(1, 10000);
 foreach ($servers AS $currserv){
-  $response = file_get_contents($currserv."?user=".$_REQUEST['user']."&serverId=".$_REQUEST['serverId']);
+  $response = file_get_contents($currserv."?user=".$_REQUEST['user']."&serverId=".$_REQUEST['serverId'], 0, $context);
   file_put_contents("log.txt", "Checking: ".json_encode(Array("server" => $currserv, "response" => $response))."\n", FILE_APPEND);
   if ($response == "YES"){
     $log[$_REQUEST['user']] = "YES";
