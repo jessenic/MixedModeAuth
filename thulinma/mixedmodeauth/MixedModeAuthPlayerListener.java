@@ -3,19 +3,15 @@
  */
 package thulinma.mixedmodeauth;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.URL;
-import java.net.URLConnection;
+import java.util.HashMap;
 
-import net.minecraft.server.EntityPlayer;
-
-import org.bukkit.craftbukkit.entity.CraftPlayer;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerListener;
 import org.bukkit.event.player.PlayerPickupItemEvent;
+import org.bukkit.event.player.PlayerPreLoginEvent;
 
 /**
  * @author Alex "Arcalyth" Riebs (original code)
@@ -23,19 +19,21 @@ import org.bukkit.event.player.PlayerPickupItemEvent;
  */
 public class MixedModeAuthPlayerListener extends PlayerListener {
   public static MixedModeAuth plugin;
+  private static HashMap<String, Integer> badNames = new HashMap<String, Integer>();
 
   private void setPlayerGuest(Player player){
     player.sendMessage("You are currently a guest, and cannot play until you login to your account.");
     player.sendMessage("Use /auth <username> <password> to login.");
     // rename to player_entID to prevent people kicking each other off
-    EntityPlayer entity = ((CraftPlayer)player).getHandle();
-    entity.name = "Player_"+entity.id;
-    entity.displayName = entity.name;
+    plugin.renameUser(player, "Player_"+player.getEntityId());
     //clear inventory
     player.getInventory().clear();
     //teleport to default spawn loc
-    player.teleport(player.getWorld().getSpawnLocation());	  
-    plugin.log.info("[MixedModeAuth] Nonpremium user has been asked to login.");
+    Location spawnat = player.getWorld().getSpawnLocation();
+    while (!spawnat.getBlock().isEmpty()){spawnat.add(0, 1, 0);}
+    spawnat.add(0, 1, 0);
+    player.teleport(spawnat);
+    plugin.log.info("[MixedModeAuth] Guest user has been asked to login.");
   }
 
   /**
@@ -44,37 +42,52 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
   public MixedModeAuthPlayerListener(MixedModeAuth instance) {
     plugin = instance;
   }
+  
+  public void onPlayerPreLogin(PlayerPreLoginEvent event){
+    //if this person would have been allowed, but is not because of failing the verify, let them in
+    if (event.getResult() != PlayerPreLoginEvent.Result.ALLOWED){
+      if (event.getKickMessage().contains("Failed to verify")){
+        plugin.log.info("[MixedModeAuth] Nonpremium user "+event.getName()+", overriding online mode protection!");
+        badNames.put(event.getName(), (int) (System.currentTimeMillis() / 1000L));
+        event.allow();
+      }
+    }else{
+      plugin.log.info("[MixedModeAuth] User "+event.getName()+" detected as premium user.");
+    }
+  }
 
   public void onPlayerJoin(PlayerJoinEvent event) {
     Player player = event.getPlayer();
     String name = player.getName();
-
+    Boolean isGood = true;
     if (name.substring(0, 6).equalsIgnoreCase("Player")) {
       setPlayerGuest(player);
     } else {
-      // Check if player is real player, first...
-      String inputLine = "";
-      try{
-        URL mcheck = new URL("http://www.minecraft.net/game/checkserver.jsp?premium="+name);
-        URLConnection mcheckc = mcheck.openConnection();
-        mcheckc.setReadTimeout(1500);
-        BufferedReader in = new BufferedReader(new InputStreamReader(mcheckc.getInputStream()));
-        inputLine = in.readLine();
-        in.close();
-      } catch(Exception e){
-        plugin.log.info("[MixedModeAuth] Premium check error, assuming nonpremium: "+e.getMessage());
-      }
-      if (inputLine.equals("PREMIUM")){
-        // [?] Tell real players to enter themselves into the AuthDB
-        if (!plugin.isUser(name)) {
-          player.sendMessage("Welcome, " + name + "! It appears this is your first time playing on this server.");
-          player.sendMessage("Please create a password for your account by typing /auth <password>");
-          player.sendMessage("This will allow you to play even if minecraft login servers are down.");
-          player.sendMessage("The server admin can see what you pick as password so don't use the same password as your Minecraft account!");
+      //if secure mode is enabled...
+      if (plugin.configuration.getBoolean("securemode", true)){
+        // Check if player is real authenticated player
+        if (badNames.containsKey(name)){
+          if (badNames.get(name) > ((int)(System.currentTimeMillis() / 1000L) - 30)){
+            isGood = false;
+          }          
+        }
+        if (isGood){
+          // Tell real players to enter themselves into the AuthDB
+          if (!plugin.isUser(name)) {
+            player.sendMessage("Welcome, " + name + "! It appears this is your first time playing on this server.");
+            player.sendMessage("Please create a password for your account by typing /auth <password>");
+            player.sendMessage("This will allow you to play even if minecraft login servers are down.");
+            player.sendMessage("The server admin can see what you pick as password so don't use the same password as your Minecraft account!");
+            plugin.log.info("[MixedModeAuth] Premium user " + name + " asked to create account.");
+          } else {
+            plugin.log.info("[MixedModeAuth] Premium user " + name + " auto-identified.");
+          }
         } else {
-          plugin.log.info("[MixedModeAuth] Premium user " + name + " auto-identified.");
+          badNames.remove(name);
+          setPlayerGuest(player);
         }
       } else {
+        badNames.remove(name);
         setPlayerGuest(player);
       }
     }

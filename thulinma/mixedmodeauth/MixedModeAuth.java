@@ -10,11 +10,19 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.HashMap;
 import java.util.logging.Logger;
 
 import net.minecraft.server.EntityPlayer;
+import net.minecraft.server.Packet20NamedEntitySpawn;
+import net.minecraft.server.Packet29DestroyEntity;
+import net.minecraft.server.Packet201PlayerInfo;
 
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.craftbukkit.entity.CraftPlayer;
@@ -24,6 +32,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.config.Configuration;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -41,6 +50,7 @@ public class MixedModeAuth extends JavaPlugin {
 
   private HashMap<String, JSONObject> users = new HashMap<String, JSONObject>();
   private PermissionHandler permissions;
+  public Configuration configuration;
 
   @Override
   public void onDisable() {
@@ -50,28 +60,59 @@ public class MixedModeAuth extends JavaPlugin {
 
   @Override
   public void onEnable() {
+    PluginDescriptionFile pdfFile = getDescription();
     PluginManager pm = this.getServer().getPluginManager();
     pm.registerEvent(Event.Type.PLAYER_JOIN, playerListener, Event.Priority.Normal, this);
+    pm.registerEvent(Event.Type.PLAYER_PRELOGIN, playerListener, Event.Priority.Normal, this);
     pm.registerEvent(Event.Type.PLAYER_PICKUP_ITEM, playerListener, Event.Priority.High, this);
     pm.registerEvent(Event.Type.PLAYER_INTERACT, playerListener, Event.Priority.High, this);
     pm.registerEvent(Event.Type.BLOCK_BREAK, blockListener, Event.Priority.High, this);
 
+    getDataFolder().mkdirs();
     loadUsers();
     setupPermissions();
-
-    PluginDescriptionFile pdfFile = getDescription();
-    log.info("[MixedModeAuth] "+pdfFile.getVersion()+" enabled.");
+    configuration = new Configuration(new File(getDataFolder(), "config.yml"));
+    configuration.load();
+    if (!getServer().getOnlineMode()){
+      log.warning("[MixedModeAuth] The server is setup in offline mode - cannot use secure mode! Please set server to online mode to enable secure mode!");
+      configuration.setProperty("securemode", false);
+    }
+    if (configuration.getBoolean("securemode", true)){
+      //if (!getURL("http://www.minecraft.net/game/checkserver.jsp?mixver=1").equals("MIXV1")){
+      //  log.warning("[MixedModeAuth] You do not appear to have properly set up the latest checkserver script and host forward. MixedModeAuth will continue, but may not be able to properly recognize premium users because of this.");
+      //}
+    }
+    if (configuration.getBoolean("securemode", true) == false){
+      log.warning("[MixedModeAuth] Secure mode is turned OFF! Autologin disabled, everyone has to login with their username and password.");
+      log.info("[MixedModeAuth] "+pdfFile.getVersion()+" enabled WITHOUT secure mode.");
+    }else{
+      log.info("[MixedModeAuth] "+pdfFile.getVersion()+" enabled in secure mode.");
+    }
   }
 
   public boolean onCommand(CommandSender sender, Command cmd, String commandLabel, String[] args) {
     if (cmd.getName().equalsIgnoreCase("auth")) {
       // [?] Provide help on /auth
       if (args.length <= 0) return false;
-      if (!(sender instanceof Player)) {
-        sender.sendMessage("This command cannot be used from the console");
+      
+      if (args[0].equals("create") || args[0].equals("new") || args[0].equals("newaccount") || args[0].equals("createaccount")){
+        if (hasPermission((Player)sender, "mixedmodeauth.create")){
+          if (args.length < 3){
+            sender.sendMessage("Usage: /auth create <new username> <new password>");
+            return true;
+          }
+          if (!isUser(args[1])){
+            newUser(args[1], args[2]);
+            sender.sendMessage("New account created with name "+args[1]);
+          }else{
+            sender.sendMessage("This account already exists!");
+          }
+        }else{
+          sender.sendMessage("You do not have permission to create accounts.");
+        }
         return true;
       }
-
+      
       if (args[0].equals("del") || args[0].equals("delete")){
         if (hasPermission((Player)sender, "mixedmodeauth.delete")){
           if (args.length < 2){
@@ -87,6 +128,11 @@ public class MixedModeAuth extends JavaPlugin {
         }else{
           sender.sendMessage("You do not have permission to delete registered players.");
         }
+        return true;
+      }
+      
+      if (!(sender instanceof Player)) {
+        sender.sendMessage("You can only delete (/auth del) or create (/auth create) users from the console");
         return true;
       }
 
@@ -110,23 +156,6 @@ public class MixedModeAuth extends JavaPlugin {
         return true;
       }
 
-      if (args[0].equals("create") || args[0].equals("new") || args[0].equals("newaccount") || args[0].equals("createaccount")){
-        if (hasPermission((Player)sender, "mixedmodeauth.create")){
-          if (args.length < 3){
-            sender.sendMessage("Usage: /auth create <new username> <new password>");
-            return true;
-          }
-          if (!isUser(args[1])){
-            newUser(args[1], args[2]);
-            sender.sendMessage("New account created with name "+args[1]);
-          }else{
-            sender.sendMessage("This account already exists!");
-          }
-        }else{
-          sender.sendMessage("You do not have permission to create accounts.");
-        }
-        return true;
-      }
 
       return authLogin(sender, args);
     }
@@ -182,15 +211,11 @@ public class MixedModeAuth extends JavaPlugin {
         else {
           // [?] Player isn't currently playing, so authenticate.
           if (authUser(loginName, password)) {
-            EntityPlayer entity = ((CraftPlayer)player).getHandle();
-            entity.name = loginName;
-            entity.displayName = entity.name;
-
+            renameUser(player, loginName);
             player.loadData();
             player.teleport(player);
-
-            player.sendMessage("You are now logged in. Welcome, " + entity.name + "!");
-            log.info("[MixedModeAuth] " + entity.name + " identified via /auth");
+            player.sendMessage("You are now logged in. Welcome, " + loginName + "!");
+            log.info("[MixedModeAuth] " + loginName + " identified via /auth");
           } else {
             player.sendMessage("Wrong username or password. Try again.");
           }
@@ -203,7 +228,6 @@ public class MixedModeAuth extends JavaPlugin {
 
   private void setupPermissions() {
     Plugin test = this.getServer().getPluginManager().getPlugin("Permissions");
-
     if (permissions == null) {
       if (test != null) {
         permissions = ((Permissions) test).getHandler();
@@ -281,10 +305,54 @@ public class MixedModeAuth extends JavaPlugin {
     return users.containsKey(name);
   }
 
+  public String getURL(String url){
+    String inputLine = "";
+    try{
+      URL mcheck = new URL(url);
+      URLConnection mcheckc = mcheck.openConnection();
+      mcheckc.setReadTimeout(1500);
+      BufferedReader in = new BufferedReader(new InputStreamReader(mcheckc.getInputStream()));
+      inputLine = in.readLine();
+      in.close();
+      return inputLine;
+    } catch(Exception e){
+      log.warning("[MixedModeAuth] Error retrieving "+url+": "+e.getMessage());
+    }
+    return "ERROR";
+  }
+
   private Boolean authUser(String name, String pass){
     if (!isUser(name)){return false;}
     String upass = (String) users.get(name).get("pass");
     return upass.equals(pass);
+  }
+
+  public void renameUser(Player p, String reName){
+    EntityPlayer entity = ((CraftPlayer)p).getHandle();
+    String oldname = entity.name;
+    entity.name = reName;
+    entity.displayName = entity.name;
+    p.setDisplayName(entity.name);
+    Location loc = p.getLocation();
+    Packet20NamedEntitySpawn p20 = new Packet20NamedEntitySpawn();
+    p20.a = p.getEntityId();
+    p20.b = reName; //Set the name of the player to the name they want.
+    p20.c = (int) Math.floor(loc.getX() * 32.0D);
+    p20.d = (int) Math.floor(loc.getY() * 32.0D);
+    p20.e = (int) Math.floor(loc.getZ() * 32.0D);
+    p20.f = (byte) ((int) loc.getYaw() * 256.0F / 360.0F);
+    p20.g = (byte) ((int) (loc.getPitch() * 256.0F / 360.0F));
+    p20.h = p.getItemInHand().getTypeId();
+    Packet29DestroyEntity p29 = new Packet29DestroyEntity(p.getEntityId());
+    Packet201PlayerInfo p201 = new Packet201PlayerInfo(oldname, false, 9999);
+    for (Player p1 : Bukkit.getServer().getOnlinePlayers()) {
+      if (p1 == p) {
+        continue;
+      }
+      ((CraftPlayer) p1).getHandle().netServerHandler.sendPacket(p29);
+      ((CraftPlayer) p1).getHandle().netServerHandler.sendPacket(p201);
+      ((CraftPlayer) p1).getHandle().netServerHandler.sendPacket(p20);
+    }
   }
 
 }
