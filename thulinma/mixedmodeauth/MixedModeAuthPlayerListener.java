@@ -60,7 +60,7 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
     Player player = event.getPlayer();
     String name = player.getName();
     Boolean isGood = true;
-    if (name.substring(0, 6).equalsIgnoreCase("Player")) {
+    if (name.toLowerCase().startsWith("player")) {
       setPlayerGuest(player);
     } else {
       //if secure mode is enabled...

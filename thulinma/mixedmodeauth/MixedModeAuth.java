@@ -96,7 +96,7 @@ public class MixedModeAuth extends JavaPlugin {
       if (args.length <= 0) return false;
       
       if (args[0].equals("create") || args[0].equals("new") || args[0].equals("newaccount") || args[0].equals("createaccount")){
-        if (hasPermission((Player)sender, "mixedmodeauth.create")){
+        if (hasPermission(sender, "mixedmodeauth.create")){
           if (args.length < 3){
             sender.sendMessage("Usage: /auth create <new username> <new password>");
             return true;
@@ -114,7 +114,7 @@ public class MixedModeAuth extends JavaPlugin {
       }
       
       if (args[0].equals("del") || args[0].equals("delete")){
-        if (hasPermission((Player)sender, "mixedmodeauth.delete")){
+        if (hasPermission(sender, "mixedmodeauth.delete")){
           if (args.length < 2){
             sender.sendMessage("Usage: /auth delete <username>");
             return true;
@@ -167,9 +167,8 @@ public class MixedModeAuth extends JavaPlugin {
 
     Player player = (Player)sender;
     String username = player.getName();
-
     // [?] Catch people that already have a name
-    if (!username.substring(0, 6).equalsIgnoreCase("Player")) {
+    if (!username.toLowerCase().startsWith("player")) {
       // [?] Already have a name, and already in the db? Must be premium or already authenticated.
       if (isUser(username)) {
         player.sendMessage("You are already logged in!");
@@ -188,7 +187,7 @@ public class MixedModeAuth extends JavaPlugin {
       String loginName = args[0];
       String password = args[1];
 
-      if (loginName.substring(0, 6).equalsIgnoreCase("Player")) {
+      if (loginName.toLowerCase().startsWith("player")) {
         player.sendMessage("Please do not start your username with \"player\". Try again.");
         return true;
       }
@@ -237,7 +236,8 @@ public class MixedModeAuth extends JavaPlugin {
     }
   }
 
-  private boolean hasPermission(Player player, String node) {
+  private boolean hasPermission(CommandSender player, String node) {
+    if (!(player instanceof Player)){return true;}
     if(permissions == null) {
       if (node.equals("mixedmodeauth.passwd")){
         return true; 
@@ -245,7 +245,7 @@ public class MixedModeAuth extends JavaPlugin {
         return player.isOp();
       }
     } else {
-      return permissions.has(player, node);
+      return permissions.has((Player)player, node);
     }
   }
 
