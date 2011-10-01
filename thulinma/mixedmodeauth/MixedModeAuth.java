@@ -28,7 +28,6 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.craftbukkit.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -36,8 +35,6 @@ import org.bukkit.util.config.Configuration;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
-import com.nijiko.permissions.PermissionHandler;
-import com.nijikokun.bukkit.Permissions.Permissions;
 
 /**
  * @author Alex "Arcalyth" Riebs (original code)
@@ -49,7 +46,6 @@ public class MixedModeAuth extends JavaPlugin {
   private final MixedModeAuthBlockListener blockListener = new MixedModeAuthBlockListener(this);
 
   private HashMap<String, JSONObject> users = new HashMap<String, JSONObject>();
-  private PermissionHandler permissions;
   public Configuration configuration;
 
   @Override
@@ -70,7 +66,6 @@ public class MixedModeAuth extends JavaPlugin {
 
     getDataFolder().mkdirs();
     loadUsers();
-    setupPermissions();
     configuration = new Configuration(new File(getDataFolder(), "config.yml"));
     configuration.load();
     if (!getServer().getOnlineMode()){
@@ -78,15 +73,22 @@ public class MixedModeAuth extends JavaPlugin {
       configuration.setProperty("securemode", false);
     }
     if (configuration.getBoolean("securemode", true)){
-      //if (!getURL("http://www.minecraft.net/game/checkserver.jsp?mixver=1").equals("MIXV1")){
-      //  log.warning("[MixedModeAuth] You do not appear to have properly set up the latest checkserver script and host forward. MixedModeAuth will continue, but may not be able to properly recognize premium users because of this.");
-      //}
+      if (configuration.getBoolean("legacymode", true)){
+        if (!getURL("http://session.minecraft.net/game/checkserver.jsp?mixver=1").equals("MIXV1")){
+          log.warning("[MixedModeAuth] You do not appear to have properly set up the latest checkserver script and host forward. Legacy mode disabled.");
+          configuration.setProperty("legacymode", false);
+        }
+      }
     }
-    if (configuration.getBoolean("securemode", true) == false){
+    if (!configuration.getBoolean("securemode", true)){
       log.warning("[MixedModeAuth] Secure mode is turned OFF! Autologin disabled, everyone has to login with their username and password.");
       log.info("[MixedModeAuth] "+pdfFile.getVersion()+" enabled WITHOUT secure mode.");
     }else{
-      log.info("[MixedModeAuth] "+pdfFile.getVersion()+" enabled in secure mode.");
+      if (!configuration.getBoolean("legacymode", false)){
+        log.info("[MixedModeAuth] "+pdfFile.getVersion()+" enabled in modded secure mode.");
+      }else{
+        log.info("[MixedModeAuth] "+pdfFile.getVersion()+" enabled in legacy secure mode.");
+      }
     }
   }
 
@@ -96,7 +98,7 @@ public class MixedModeAuth extends JavaPlugin {
       if (args.length <= 0) return false;
       
       if (args[0].equals("create") || args[0].equals("new") || args[0].equals("newaccount") || args[0].equals("createaccount")){
-        if (hasPermission(sender, "mixedmodeauth.create")){
+        if (sender.hasPermission("mixedmodeauth.create")){
           if (args.length < 3){
             sender.sendMessage("Usage: /auth create <new username> <new password>");
             return true;
@@ -114,7 +116,7 @@ public class MixedModeAuth extends JavaPlugin {
       }
       
       if (args[0].equals("del") || args[0].equals("delete")){
-        if (hasPermission(sender, "mixedmodeauth.delete")){
+        if (sender.hasPermission("mixedmodeauth.delete")){
           if (args.length < 2){
             sender.sendMessage("Usage: /auth delete <username>");
             return true;
@@ -137,7 +139,7 @@ public class MixedModeAuth extends JavaPlugin {
       }
 
       if (args[0].equals("pass") || args[0].equals("password") || args[0].equals("passwd")){
-        if (hasPermission((Player)sender, "mixedmodeauth.passwd")){
+        if (sender.hasPermission("mixedmodeauth.passwd")){
           if (args.length < 2){
             sender.sendMessage("Usage: /auth password <new password>");
             return true;
@@ -194,7 +196,7 @@ public class MixedModeAuth extends JavaPlugin {
 
       // [?] Does the player exist on the server?
       if (!isUser(loginName)) {
-        if (hasPermission((Player)sender, "mixedmodeauth.create")){
+        if (sender.hasPermission("mixedmodeauth.create")){
           newUser(loginName, password);
           player.sendMessage("You have registered the name " + loginName + ". Use /auth again to authenticate.");
           log.info("[MixedModeAuth] New user " + loginName + " created");
@@ -223,30 +225,6 @@ public class MixedModeAuth extends JavaPlugin {
     }
 
     return true;
-  }
-
-  private void setupPermissions() {
-    Plugin test = this.getServer().getPluginManager().getPlugin("Permissions");
-    if (permissions == null) {
-      if (test != null) {
-        permissions = ((Permissions) test).getHandler();
-      } else {
-        log.info("[MixedModeAuth] Permission system not detected, falling back to defaults.");
-      }
-    }
-  }
-
-  private boolean hasPermission(CommandSender player, String node) {
-    if (!(player instanceof Player)){return true;}
-    if(permissions == null) {
-      if (node.equals("mixedmodeauth.passwd")){
-        return true; 
-      }else{
-        return player.isOp();
-      }
-    } else {
-      return permissions.has((Player)player, node);
-    }
   }
 
   private void loadUsers() {
@@ -333,6 +311,7 @@ public class MixedModeAuth extends JavaPlugin {
     entity.name = reName;
     entity.displayName = entity.name;
     p.setDisplayName(entity.name);
+    p.recalculatePermissions();
     Location loc = p.getLocation();
     Packet20NamedEntitySpawn p20 = new Packet20NamedEntitySpawn();
     p20.a = p.getEntityId();

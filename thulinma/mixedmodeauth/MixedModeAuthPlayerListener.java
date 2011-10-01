@@ -42,7 +42,7 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
   public MixedModeAuthPlayerListener(MixedModeAuth instance) {
     plugin = instance;
   }
-  
+
   public void onPlayerPreLogin(PlayerPreLoginEvent event){
     //if this person would have been allowed, but is not because of failing the verify, let them in
     if (event.getResult() != PlayerPreLoginEvent.Result.ALLOWED){
@@ -53,6 +53,16 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
       }
     }else{
       plugin.log.info("[MixedModeAuth] User "+event.getName()+" detected as premium user.");
+      /*
+      for (Player p : plugin.getServer().getOnlinePlayers()){
+        if (p.getAddress().getAddress() == event.getAddress()){
+          if (p.getName().toLowerCase().startsWith("player")){
+            plugin.renameUser(p, event.getName());
+            p.sendMessage("[MixedModeAuth] Welcome "+event.getName()+", you have been verified!");
+          }
+        }
+      }
+       */
     }
   }
 
@@ -60,7 +70,7 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
     Player player = event.getPlayer();
     String name = player.getName();
     Boolean isGood = true;
-    if (name.toLowerCase().startsWith("player")) {
+    if (name.toLowerCase().startsWith("player")){
       setPlayerGuest(player);
     } else {
       //if secure mode is enabled...
@@ -70,6 +80,10 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
           if (badNames.get(name) > ((int)(System.currentTimeMillis() / 1000L) - 30)){
             isGood = false;
           }          
+        }else{
+          if (plugin.configuration.getBoolean("legacymode", false)){
+            isGood = plugin.getURL("http://session.minecraft.net/game/checkserver.jsp?premium="+name).equals("PREMIUM");
+          }
         }
         if (isGood){
           // Tell real players to enter themselves into the AuthDB

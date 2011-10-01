@@ -1,10 +1,9 @@
-<?
+<?php
 //Rerouting Auth script, PHP version
 //By Thulinma, Sep 1 2011
-//License: Do what you want with it, but give me credit for at least the concept.
 //
 //Description:
-//Changes the reply to the server from miencraft to always be "YES", allowing all users to login.
+//Changes the reply to the server from minecraft to always be "YES", allowing all users to login.
 //A plugin can then check the login status afterwards, giving access to the named account or not.
 //
 //Usage:
@@ -28,18 +27,14 @@ $HTTP["host"] =~ "(^|\.)minecraft.net$" {
 //Responses: PREMIUM or NOTPREMIUM
 //This check will work only once per login, so new users signing in with the same name afterwards are
 //not seen as the same person unless they actually are the same person.
-//
-//Finally, this script has only one setting, it controls what login servers are accepted.
-//My default accepts both the official minecraft server as well as the mineshafter server.
-//You can add your own login server here or some other - I don't know how many exist.
-//If you do not want to accept mineshafter logins, simply remove it here from the array.
-//These servers will be checked in the order you put them in.
-$servers = Array("http://session.minecraft.net/game/checkserver.jsp", "http://mineshafter.appspot.com/game/checkserver.jsp");
 
 
 
 //Script starts here, you probably don't want to modify anything below here.
 
+
+//Return script version if asked
+if ($_REQUEST['mixver']){die("MIXV1");}
 
 //Load the current waitinglist.
 $log = json_decode(file_get_contents("logins.json"), true);
@@ -56,32 +51,29 @@ if ($_REQUEST['premium']){
 
 //check for proper config, if called without variables.
 if (!$_REQUEST['user'] && !$_REQUEST['serverId']){
-  if ($_SERVER["HTTP_HOST"] == "www.minecraft.net"){
+  if ($_SERVER["HTTP_HOST"] == "session.minecraft.net"){
     die("The script is installed properly! Yay!");
   }else{
-    die("Please add a line to your hosts file to reroute www.minecraft.net to the address of this server (localhost?)!");
+    die("Please add a line to your hosts file to reroute session.minecraft.net to the address of this server (localhost?)!");
   }
 }
 
 $log[$_REQUEST['user']] = "NO";
 
-//create stream context with 2-second timeout
-$context = stream_context_create(array('http' => array('timeout' => 2)));
+// We need to override the IP for session.minecraft.net because of the hosts file edits
+// 184.73.166.45 is the IP for session.minecraft.net
+$ch = curl_init();
+$headers = array("Host: session.minecraft.net");
+curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+curl_setopt($ch, CURLOPT_URL, "http://184.73.166.45/game/checkserver.jsp?user=".$_REQUEST['user']."&serverId=".$_REQUEST['serverId']);
+curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+$response = curl_exec($ch);
+file_put_contents("log.txt", "Checking: ".json_encode(Array("server" => "MCNET", "response" => $response))."\n", FILE_APPEND);
+if ($response == "YES"){$log[$_REQUEST['user']] = "YES";}
 
-//check all servers
-$_REQUEST['random'] = rand(1, 10000);
-foreach ($servers AS $currserv){
-  $response = file_get_contents($currserv."?user=".$_REQUEST['user']."&serverId=".$_REQUEST['serverId'], 0, $context);
-  file_put_contents("log.txt", "Checking: ".json_encode(Array("server" => $currserv, "response" => $response))."\n", FILE_APPEND);
-  if ($response == "YES"){
-    $log[$_REQUEST['user']] = "YES";
-    file_put_contents("logins.json", json_encode($log));
-    //Return yes after a correct login is found.
-    die("YES");
-  }
-}
-
-//Store the failed auth.
+//Store the auth status.
 file_put_contents("logins.json", json_encode($log));
 //Always return yes to the server - a plugin will further check it.
 die("YES");
+?>
