@@ -73,7 +73,7 @@ public class MixedModeAuth extends JavaPlugin {
       configuration.setProperty("securemode", false);
     }
     if (configuration.getBoolean("securemode", true)){
-      if (configuration.getBoolean("legacymode", true)){
+      if (configuration.getBoolean("legacymode", false)){
         if (!getURL("http://session.minecraft.net/game/checkserver.jsp?mixver=1").equals("MIXV1")){
           log.warning("[MixedModeAuth] You do not appear to have properly set up the latest checkserver script and host forward. Legacy mode disabled.");
           configuration.setProperty("legacymode", false);
