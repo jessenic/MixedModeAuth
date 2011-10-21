@@ -31,7 +31,7 @@ import org.bukkit.event.Event;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.util.config.Configuration;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -46,7 +46,7 @@ public class MixedModeAuth extends JavaPlugin {
   private final MixedModeAuthBlockListener blockListener = new MixedModeAuthBlockListener(this);
 
   private HashMap<String, JSONObject> users = new HashMap<String, JSONObject>();
-  public Configuration configuration;
+  public FileConfiguration configuration;
 
   @Override
   public void onDisable() {
@@ -66,17 +66,26 @@ public class MixedModeAuth extends JavaPlugin {
 
     getDataFolder().mkdirs();
     loadUsers();
-    configuration = new Configuration(new File(getDataFolder(), "config.yml"));
-    configuration.load();
+    configuration = this.getConfig();
     if (!getServer().getOnlineMode()){
       log.warning("[MixedModeAuth] The server is setup in offline mode - cannot use secure mode! Please set server to online mode to enable secure mode!");
-      configuration.setProperty("securemode", false);
+      configuration.set("securemode", false);
     }
     if (configuration.getBoolean("securemode", true)){
+      if (!configuration.getBoolean("legacymode", false)){
+        if (!this.getServer().getVersion().contains("PreLogMod")){
+          log.warning("[MixedModeAuth] You do not have the server mod installed! Switching to legacy mode...");
+          configuration.set("legacymode", true);
+        }
+      }
       if (configuration.getBoolean("legacymode", false)){
         if (!getURL("http://session.minecraft.net/game/checkserver.jsp?mixver=1").equals("MIXV1")){
           log.warning("[MixedModeAuth] You do not appear to have properly set up the latest checkserver script and host forward. Legacy mode disabled.");
-          configuration.setProperty("legacymode", false);
+          configuration.set("legacymode", false);
+          if (!this.getServer().getVersion().contains("PreLogMod")){
+            log.warning("[MixedModeAuth] No valid checkserver script and no server mod installed - disabling secure mode.");
+            configuration.set("securemode", false);
+          }
         }
       }
     }
