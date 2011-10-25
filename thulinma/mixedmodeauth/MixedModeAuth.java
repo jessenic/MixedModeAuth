@@ -114,6 +114,7 @@ public class MixedModeAuth extends JavaPlugin {
           }
           if (!isUser(args[1])){
             newUser(args[1], args[2]);
+            saveUsers();
             sender.sendMessage("New account created with name "+args[1]);
           }else{
             sender.sendMessage("This account already exists!");
@@ -132,6 +133,7 @@ public class MixedModeAuth extends JavaPlugin {
           }
           if (isUser(args[1])){
             delUser(args[1]);
+            saveUsers();
             sender.sendMessage("User "+args[1]+" deleted from registered users.");
           }else{
             sender.sendMessage("There is no such registered user: "+args[1]);
@@ -157,6 +159,7 @@ public class MixedModeAuth extends JavaPlugin {
           if (isUser(user)){
             delUser(user);
             newUser(user, args[1]);
+            saveUsers();
             sender.sendMessage("Your password has been changed.");
           }else{
             sender.sendMessage("You are not currently logged in!");
@@ -185,6 +188,7 @@ public class MixedModeAuth extends JavaPlugin {
         player.sendMessage("You are already logged in!");
       } else {
         newUser(username, args[0]);
+        saveUsers();
         player.sendMessage("Password saved! You can now play.");
       }
       return true;
@@ -207,6 +211,7 @@ public class MixedModeAuth extends JavaPlugin {
       if (!isUser(loginName)) {
         if (sender.hasPermission("mixedmodeauth.create")){
           newUser(loginName, password);
+          saveUsers();
           player.sendMessage("You have registered the name " + loginName + ". Use /auth again to authenticate.");
           log.info("[MixedModeAuth] New user " + loginName + " created");
         }else{
@@ -285,13 +290,11 @@ public class MixedModeAuth extends JavaPlugin {
     user.put("name", name);
     user.put("hashed", BCrypt.hashpw(pass, BCrypt.gensalt()));
     users.put(name, user);
-    saveUsers();
   }
 
   private void delUser(String name){
     if (isUser(name)){
       users.remove(name);
-      saveUsers();
     }
   }
 
