@@ -236,6 +236,7 @@ public class MixedModeAuth extends JavaPlugin {
     return true;
   }
 
+  @SuppressWarnings("unchecked")
   private void loadUsers() {
     JSONParser parser = new JSONParser();
     try {
@@ -244,6 +245,12 @@ public class MixedModeAuth extends JavaPlugin {
       JSONArray data = (JSONArray) parser.parse(reader);
       for (Object obj : data) {
         JSONObject user = (JSONObject) obj;
+        if (!user.containsKey("hashed")){
+          if (user.containsKey("pass")){
+            user.put("hashed", BCrypt.hashpw((String)user.get("pass"), BCrypt.gensalt()));
+            user.remove("pass");
+          }
+        }
         users.put((String) user.get("name"), user);
       }
       reader.close();
@@ -276,7 +283,7 @@ public class MixedModeAuth extends JavaPlugin {
   private void newUser(String name, String pass){
     JSONObject user = new JSONObject();
     user.put("name", name);
-    user.put("pass", pass);
+    user.put("hashed", BCrypt.hashpw(pass, BCrypt.gensalt()));
     users.put(name, user);
     saveUsers();
   }
@@ -310,8 +317,7 @@ public class MixedModeAuth extends JavaPlugin {
 
   private Boolean authUser(String name, String pass){
     if (!isUser(name)){return false;}
-    String upass = (String) users.get(name).get("pass");
-    return upass.equals(pass);
+    return BCrypt.checkpw(pass, (String) users.get(name).get("hashed"));
   }
 
   public void renameUser(Player p, String reName){
