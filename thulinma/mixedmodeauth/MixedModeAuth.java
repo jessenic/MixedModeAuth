@@ -99,6 +99,9 @@ public class MixedModeAuth extends JavaPlugin {
         log.info("[MixedModeAuth] "+pdfFile.getVersion()+" enabled in legacy secure mode.");
       }
     }
+    if (!configuration.getBoolean("renameguests", true)){
+      log.info("[MixedModeAuth] Guest renaming disabled - all guests will kick each other off!");      
+    }
   }
 
   public boolean onCommand(CommandSender sender, Command cmd, String commandLabel, String[] args) {

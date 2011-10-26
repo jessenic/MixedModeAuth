@@ -24,8 +24,12 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
   private void setPlayerGuest(Player player){
     player.sendMessage("You are currently a guest, and cannot play until you login to your account.");
     player.sendMessage("Use /auth <username> <password> to login.");
-    // rename to player_entID to prevent people kicking each other off
-    plugin.renameUser(player, "Player_"+player.getEntityId());
+    if (plugin.configuration.getBoolean("renameguests", true)){
+      // rename to player_entID to prevent people kicking each other off
+      plugin.renameUser(player, "Player_"+player.getEntityId());
+    }else{
+      plugin.renameUser(player, "Player");
+    }
     //clear inventory
     player.getInventory().clear();
     //teleport to default spawn loc
