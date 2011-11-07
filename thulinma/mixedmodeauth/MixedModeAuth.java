@@ -31,7 +31,6 @@ import org.bukkit.event.Event;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -46,7 +45,7 @@ public class MixedModeAuth extends JavaPlugin {
   private final MixedModeAuthBlockListener blockListener = new MixedModeAuthBlockListener(this);
 
   private HashMap<String, JSONObject> users = new HashMap<String, JSONObject>();
-  public FileConfiguration configuration;
+  public Configuration configuration;
 
   @Override
   public void onDisable() {
@@ -58,15 +57,11 @@ public class MixedModeAuth extends JavaPlugin {
   public void onEnable() {
     PluginDescriptionFile pdfFile = getDescription();
     PluginManager pm = this.getServer().getPluginManager();
-    pm.registerEvent(Event.Type.PLAYER_JOIN, playerListener, Event.Priority.Normal, this);
-    pm.registerEvent(Event.Type.PLAYER_PRELOGIN, playerListener, Event.Priority.Normal, this);
-    pm.registerEvent(Event.Type.PLAYER_PICKUP_ITEM, playerListener, Event.Priority.High, this);
-    pm.registerEvent(Event.Type.PLAYER_INTERACT, playerListener, Event.Priority.High, this);
-    pm.registerEvent(Event.Type.BLOCK_BREAK, blockListener, Event.Priority.High, this);
 
     getDataFolder().mkdirs();
     loadUsers();
-    configuration = this.getConfig();
+    configuration = new Configuration(this);
+    configuration.load();
     if (!getServer().getOnlineMode()){
       log.warning("[MixedModeAuth] The server is setup in offline mode - cannot use secure mode! Please set server to online mode to enable secure mode!");
       configuration.set("securemode", false);
@@ -100,7 +95,20 @@ public class MixedModeAuth extends JavaPlugin {
       }
     }
     if (!configuration.getBoolean("renameguests", true)){
-      log.info("[MixedModeAuth] Guest renaming disabled - all guests will kick each other off!");      
+      log.info("[MixedModeAuth] Guest renaming disabled - all guests will kick each other off!");
+    }
+    pm.registerEvent(Event.Type.PLAYER_JOIN, playerListener, Event.Priority.Monitor, this);
+    pm.registerEvent(Event.Type.PLAYER_PRELOGIN, playerListener, Event.Priority.Normal, this);
+    if (configuration.getBoolean("blockinteractions", true)){
+      pm.registerEvent(Event.Type.PLAYER_PICKUP_ITEM, playerListener, Event.Priority.High, this);
+      pm.registerEvent(Event.Type.PLAYER_INTERACT, playerListener, Event.Priority.High, this);
+      pm.registerEvent(Event.Type.BLOCK_BREAK, blockListener, Event.Priority.High, this);
+    }else{
+      log.info("[MixedModeAuth] Guest interactions will not be blocked by this plugin.");
+    }
+    if (configuration.getBoolean("kickusednames", true)){
+      pm.registerEvent(Event.Type.PLAYER_LOGIN, playerListener, Event.Priority.Normal, this);
+      pm.registerEvent(Event.Type.PLAYER_KICK, playerListener, Event.Priority.Normal, this);
     }
   }
 
@@ -155,7 +163,7 @@ public class MixedModeAuth extends JavaPlugin {
       if (args[0].equals("pass") || args[0].equals("password") || args[0].equals("passwd")){
         if (sender.hasPermission("mixedmodeauth.passwd")){
           if (args.length < 2){
-            sender.sendMessage("Usage: /auth password <new password>");
+            sendMess(sender, "passwdusage");
             return true;
           }
           String user = ((Player)sender).getName();
@@ -163,12 +171,12 @@ public class MixedModeAuth extends JavaPlugin {
             delUser(user);
             newUser(user, args[1]);
             saveUsers();
-            sender.sendMessage("Your password has been changed.");
+            sendMess(sender, "passchanged");
           }else{
-            sender.sendMessage("You are not currently logged in!");
+            sendMess(sender, "notloggedin");
           }
         }else{
-          sender.sendMessage("You do not have permission to change your password.");
+          sendMess(sender, "nopassperm");
         }
         return true;
       }
@@ -188,17 +196,17 @@ public class MixedModeAuth extends JavaPlugin {
     if (!username.toLowerCase().startsWith("player")) {
       // [?] Already have a name, and already in the db? Must be premium or already authenticated.
       if (isUser(username)) {
-        player.sendMessage("You are already logged in!");
+        sendMess(sender, "alreadylogged");
       } else {
         newUser(username, args[0]);
         saveUsers();
-        player.sendMessage("Password saved! You can now play.");
+        sendMess(sender, "newuser");
       }
       return true;
     } else {
       // [?] I'm a guest, help!
       if (args.length < 2) {
-        player.sendMessage("Please supply a username AND password.");
+        sendMess(sender, "authsyntax");
         return true;
       }
 
@@ -206,7 +214,7 @@ public class MixedModeAuth extends JavaPlugin {
       String password = args[1];
 
       if (loginName.toLowerCase().startsWith("player")) {
-        player.sendMessage("Please do not start your username with \"player\". Try again.");
+        sendMess(sender, "playerprefix");
         return true;
       }
 
@@ -215,27 +223,26 @@ public class MixedModeAuth extends JavaPlugin {
         if (sender.hasPermission("mixedmodeauth.create")){
           newUser(loginName, password);
           saveUsers();
-          player.sendMessage("You have registered the name " + loginName + ". Use /auth again to authenticate.");
+          sendMess(sender, "newaccount");
           log.info("[MixedModeAuth] New user " + loginName + " created");
         }else{
-          player.sendMessage("You are not allowed to create new accounts.");
-          player.sendMessage("To create a new account: login to this server using your minecraft account, or ask an admin to create one for you.");
+          sendMess(sender, "createnotallowed");
         }
       } else {
         // [?] Player exists, is he online?
         Player checkPlayer = getServer().getPlayer(loginName);
         if (checkPlayer != null && checkPlayer.isOnline())
-          player.sendMessage("Someone is already playing as " + loginName + "!");
+          sendMess(sender, "inuse");
         else {
           // [?] Player isn't currently playing, so authenticate.
           if (authUser(loginName, password)) {
             renameUser(player, loginName);
             player.loadData();
             player.teleport(player);
-            player.sendMessage("You are now logged in. Welcome, " + loginName + "!");
+            sendMess(sender, "login");
             log.info("[MixedModeAuth] " + loginName + " identified via /auth");
           } else {
-            player.sendMessage("Wrong username or password. Try again.");
+            sendMess(sender, "wronglogin");
           }
         }
       }
@@ -354,5 +361,14 @@ public class MixedModeAuth extends JavaPlugin {
       ((CraftPlayer) p1).getHandle().netServerHandler.sendPacket(p20);
     }
   }
-
+  
+  public void sendMess(CommandSender to, String mess) {
+    String message = configuration.getString("messages."+mess);
+    if (message != null && !message.isEmpty()){
+      for (String line: message.split("\n")) {
+        to.sendMessage(line);
+      }
+    }
+  }
+  
 }

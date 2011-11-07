@@ -22,7 +22,7 @@ public class MixedModeAuthBlockListener extends BlockListener {
     Player player = event.getPlayer();
     if (!plugin.isUser(player.getName())) {
       event.setCancelled(true);
-      player.sendMessage("You cannot play until you have an active account.");
+      plugin.sendMess(player, "interactionblocked");
     }
   }
 }

@@ -9,7 +9,9 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.event.player.PlayerListener;
+import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.player.PlayerPickupItemEvent;
 import org.bukkit.event.player.PlayerPreLoginEvent;
 
@@ -22,8 +24,7 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
   private static HashMap<String, Integer> badNames = new HashMap<String, Integer>();
 
   private void setPlayerGuest(Player player){
-    player.sendMessage("You are currently a guest, and cannot play until you login to your account.");
-    player.sendMessage("Use /auth <username> <password> to login.");
+    plugin.sendMess(player, "guestwelcome");
     if (plugin.configuration.getBoolean("renameguests", true)){
       // rename to player_entID to prevent people kicking each other off
       plugin.renameUser(player, "Player_"+player.getEntityId());
@@ -38,6 +39,18 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
     spawnat.add(0, 1, 0);
     player.teleport(spawnat);
     plugin.log.info("[MixedModeAuth] Guest user has been asked to login.");
+    
+    if (plugin.configuration.getLong("kicktimeout") > 0){
+      Task kicktask = new Task(plugin, player) {
+        public void run() {
+          if (!plugin.isUser(((Player)getArg(0)).getName())){
+            ((Player)getArg(0)).kickPlayer(plugin.configuration.getString("messages.kicktimeout"));
+          }
+        }
+      };
+      kicktask.startDelayed(plugin.configuration.getLong("kicktimeout")*20, false);
+    }
+
   }
 
   /**
@@ -92,12 +105,10 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
         if (isGood){
           // Tell real players to enter themselves into the AuthDB
           if (!plugin.isUser(name)) {
-            player.sendMessage("Welcome, " + name + "! It appears this is your first time playing on this server.");
-            player.sendMessage("Please create a password for your account by typing /auth <password>");
-            player.sendMessage("This will allow you to play even if minecraft login servers are down.");
-            player.sendMessage("The server admin can see what you pick as password so don't use the same password as your Minecraft account!");
+            plugin.sendMess(player, "premiumwelcome");
             plugin.log.info("[MixedModeAuth] Premium user " + name + " asked to create account.");
           } else {
+            plugin.sendMess(player, "premiumautolog");
             plugin.log.info("[MixedModeAuth] Premium user " + name + " auto-identified.");
           }
         } else {
@@ -110,12 +121,24 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
       }
     }
   }
+  
+  public void onPlayerLogin(PlayerLoginEvent event){
+    if (plugin.getServer().getPlayerExact(event.getEventName()) != null){
+      event.disallow(PlayerLoginEvent.Result.KICK_OTHER, plugin.configuration.getString("messages.kickusedname"));
+    }
+  }
+  
+  public void onPlayerKick(PlayerKickEvent event) {
+    if (event.getReason().equals("Logged in from another location.")) {
+      if (plugin.isUser(event.getPlayer().getName())){event.setCancelled(true);}
+    }
+  }
 
   public void onPlayerInteract(PlayerInteractEvent event){
     Player player = event.getPlayer();
     if (!plugin.isUser(player.getName())) {
       event.setCancelled(true);
-      player.sendMessage("You cannot play until you have an active account.");
+      plugin.sendMess(player, "interactionblocked");
     }
   }
 
@@ -123,7 +146,7 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
     Player player = event.getPlayer();
     if (!plugin.isUser(player.getName())) {
       event.setCancelled(true);
-      player.sendMessage("You cannot play until you have an active account.");
+      plugin.sendMess(player, "interactionblocked");
     }
   }
 

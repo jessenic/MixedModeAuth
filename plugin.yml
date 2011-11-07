@@ -1,6 +1,6 @@
 name: MixedModeAuth
 main: thulinma.mixedmodeauth.MixedModeAuth
-version: 2.3
+version: 2.4
 description: Provides a mixed mode between offline and online server modes - allowing for fully secured servers that work both with and without a valid minecraft login.
 authors: [Thulinma]
 
@@ -10,7 +10,6 @@ commands:
         usage: |
             /auth <username> <password> - Log into or create an account (as guest).
             /auth <password> - Create an account (as premium user).
-            /auth list - List registered players.
             /auth delete <username> - Delete a registered player.
             /auth password <new password> - Change your password.
             /auth create <username> <password> - Create a new account for somebody else.

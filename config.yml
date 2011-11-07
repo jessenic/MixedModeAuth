@@ -1,0 +1,52 @@
+# securemode true means premium users will be automatically
+# authorized. If it is set to false, everyone has to login,
+# always.
+# (yes, it is somewhat of a misnomer, for historic reasons ^_^ )
+securemode: true
+
+# legacy mode uses/requires the checkserver script setting this to
+# false means using the server mod, which is more reliable.
+legacymode: false
+
+# renameguests will rename guest users to Player_randomnumberhere.
+# This causes all usernames to be unique, so no players kick each
+# other off.
+renameguests: true
+
+# blockinteractions will block all interactions for non-authorized
+# users, so they cannot do anything besides walking around until
+# they log in. Disable this if you use another plugin for that.
+blockinteractions: true
+
+# kickusednames will kick users signing on using names that are
+# already in use, instead of the default behaviour of kicking the
+# user that was online first.
+kickusednames: true
+
+# kicktimeout is the amount of seconds to wait before kicking people
+# if they do not login. 0 means do not kick.
+kicktimeout: 60
+
+# These are the messages that are sent to players at certain times.
+# Empty means do not send a message.
+# \n can be used for newlines.
+messages:
+    interactionblocked: "You cannot play until you have an active account."
+    newuser: "Password saved! You can now play."
+    alreadylogged: "You are already logged in!"
+    login: "You are now logged in. Welcome!"
+    wronglogin: "Wrong username or password. Try again."
+    passwdusage: "Usage: /auth password <new password>"
+    passchanged: "Your password has been changed."
+    notloggedin: "You are not currently logged in!"
+    nopassperm: "You do not have permission to change your password."
+    authsyntax: "Please supply a username AND password."
+    playerprefix: "Please do not start your username with \"player\". Try again."
+    newaccount: "You have registered an account. Use /auth again to authenticate."
+    createnotallowed: "You are not allowed to create new accounts. To create a new account: login to this server using your minecraft account, or ask an admin to create one for you."
+    inuse: "Somebody is already playing on that account!"
+    kickusedname: "A user with this name is already online."
+    premiumwelcome: "Welcome! It appears this is your first time playing on this server.\nPlease create a password for your account by typing /auth <password>\nThis will allow you to play even if minecraft login servers are down."
+    guestwelcome: "You are currently a guest, and cannot play until you login to your account.\nUse /auth <username> <password> to login."
+    kicktimeout: "You did not login fast enough."
+    premiumautolog: ""
