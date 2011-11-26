@@ -28,6 +28,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.craftbukkit.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -334,6 +336,7 @@ public class MixedModeAuth extends JavaPlugin {
   }
 
   public void renameUser(Player p, String reName){
+	this.getServer().getPluginManager().callEvent(new PlayerQuitEvent(p, null));
     EntityPlayer entity = ((CraftPlayer)p).getHandle();
     String oldname = entity.name;
     entity.name = reName;
@@ -360,6 +363,8 @@ public class MixedModeAuth extends JavaPlugin {
       ((CraftPlayer) p1).getHandle().netServerHandler.sendPacket(p201);
       ((CraftPlayer) p1).getHandle().netServerHandler.sendPacket(p20);
     }
+
+	this.getServer().getPluginManager().callEvent(new PlayerJoinEvent(p, oldname+" logged in as "+reName));
   }
   
   public void sendMess(CommandSender to, String mess) {
