@@ -20,6 +20,7 @@ import net.minecraft.server.EntityPlayer;
 import net.minecraft.server.Packet20NamedEntitySpawn;
 import net.minecraft.server.Packet29DestroyEntity;
 import net.minecraft.server.Packet201PlayerInfo;
+import net.minecraft.server.Packet9Respawn;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -341,6 +342,13 @@ public class MixedModeAuth extends JavaPlugin {
     entity.displayName = entity.name;
     p.setDisplayName(entity.name);
     p.recalculatePermissions();
+    Packet9Respawn p9 = new Packet9Respawn();
+    p9.a = p.getWorld().getSeed();
+    p9.b = p.getWorld().getEnvironment().getId();
+    p9.c = p.getWorld().getDifficulty().getValue();
+    p9.d = p.getWorld().getMaxHeight();
+    p9.e = p.getGameMode().getValue();
+    ((CraftPlayer) p).getHandle().netServerHandler.sendPacket(p9);
     Location loc = p.getLocation();
     Packet20NamedEntitySpawn p20 = new Packet20NamedEntitySpawn();
     p20.a = p.getEntityId();
