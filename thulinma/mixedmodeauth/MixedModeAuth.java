@@ -336,7 +336,7 @@ public class MixedModeAuth extends JavaPlugin {
   }
 
   public void renameUser(Player p, String reName){
-	this.getServer().getPluginManager().callEvent(new PlayerQuitEvent(p, null));
+	this.getServer().getPluginManager().callEvent(new FakePlayerQuitEvent(p, null));
     EntityPlayer entity = ((CraftPlayer)p).getHandle();
     String oldname = entity.name;
     entity.name = reName;
@@ -364,7 +364,7 @@ public class MixedModeAuth extends JavaPlugin {
       ((CraftPlayer) p1).getHandle().netServerHandler.sendPacket(p20);
     }
 
-	this.getServer().getPluginManager().callEvent(new PlayerJoinEvent(p, oldname+" logged in as "+reName));
+	this.getServer().getPluginManager().callEvent(new FakePlayerJoinEvent(p, oldname+" logged in as "+reName));
   }
   
   public void sendMess(CommandSender to, String mess) {
