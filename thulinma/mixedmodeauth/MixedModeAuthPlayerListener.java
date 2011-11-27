@@ -7,6 +7,7 @@ import java.util.HashMap;
 
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerKickEvent;
@@ -153,4 +154,19 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
     }
   }
 
+  public void onPlayerCommandPreprocess(PlayerCommandPreprocessEvent event) {
+    Player player = event.getPlayer();
+    String[] split = event.getMessage().split(" ");
+    String[] allowedcmds = ("auth " + plugin.configuration.getString(
+        "commandwhitelist", "")).split(" ");
+    if (!plugin.isUser(player.getName())) {
+      for (String acmd : allowedcmds) {
+        if (split[0].equalsIgnoreCase(acmd)) {
+          return;
+        }
+      }
+      plugin.sendMess(player, "commandsblocked");
+      event.setCancelled(true);
+    }
+  }
 }

@@ -110,6 +110,9 @@ public class MixedModeAuth extends JavaPlugin {
       pm.registerEvent(Event.Type.PLAYER_LOGIN, playerListener, Event.Priority.Normal, this);
       pm.registerEvent(Event.Type.PLAYER_KICK, playerListener, Event.Priority.Normal, this);
     }
+    if (configuration.getBoolean("disallowcommands", false)){
+      pm.registerEvent(Event.Type.PLAYER_COMMAND_PREPROCESS, playerListener, Event.Priority.Normal, this);
+    }
   }
 
   public boolean onCommand(CommandSender sender, Command cmd, String commandLabel, String[] args) {

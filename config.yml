@@ -18,6 +18,14 @@ renameguests: true
 # they log in. Disable this if you use another plugin for that.
 blockinteractions: true
 
+# disallowcommands will block all commands for non-authorized
+# users, excluding /auth command.
+disallowcommands: false
+
+# commandwhitelist will allow specified commands for non-authorized
+# users, if disallowcommands is set to true.
+commandwhitelist: me help
+
 # kickusednames will kick users signing on using names that are
 # already in use, instead of the default behaviour of kicking the
 # user that was online first.
@@ -32,6 +40,7 @@ kicktimeout: 60
 # \n can be used for newlines.
 messages:
     interactionblocked: "You cannot play until you have an active account."
+    commandsblocked: "You cannot use this command until you have an active account."
     newuser: "Password saved! You can now play."
     alreadylogged: "You are already logged in!"
     login: "You are now logged in. Welcome!"
