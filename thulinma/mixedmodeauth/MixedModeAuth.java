@@ -16,10 +16,8 @@ import java.net.URLConnection;
 import java.util.HashMap;
 import java.util.logging.Logger;
 
-import net.minecraft.server.EntityPlayer;
 import net.minecraft.server.Packet20NamedEntitySpawn;
 import net.minecraft.server.Packet29DestroyEntity;
-import net.minecraft.server.Packet201PlayerInfo;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -334,11 +332,9 @@ public class MixedModeAuth extends JavaPlugin {
   }
 
   public void renameUser(Player p, String reName){
-    EntityPlayer entity = ((CraftPlayer)p).getHandle();
-    String oldname = entity.name;
-    entity.name = reName;
-    entity.displayName = entity.name;
-    p.setDisplayName(entity.name);
+    ((CraftPlayer)p).getHandle().name = reName;
+    p.setDisplayName(reName);
+    p.setPlayerListName(reName);
     p.recalculatePermissions();
     Location loc = p.getLocation();
     Packet20NamedEntitySpawn p20 = new Packet20NamedEntitySpawn();
@@ -351,13 +347,10 @@ public class MixedModeAuth extends JavaPlugin {
     p20.g = (byte) ((int) (loc.getPitch() * 256.0F / 360.0F));
     p20.h = p.getItemInHand().getTypeId();
     Packet29DestroyEntity p29 = new Packet29DestroyEntity(p.getEntityId());
-    Packet201PlayerInfo p201 = new Packet201PlayerInfo(oldname, false, 9999);
+    
     for (Player p1 : Bukkit.getServer().getOnlinePlayers()) {
-      if (p1 == p) {
-        continue;
-      }
+      if (p1 == p){continue;}
       ((CraftPlayer) p1).getHandle().netServerHandler.sendPacket(p29);
-      ((CraftPlayer) p1).getHandle().netServerHandler.sendPacket(p201);
       ((CraftPlayer) p1).getHandle().netServerHandler.sendPacket(p20);
     }
   }
