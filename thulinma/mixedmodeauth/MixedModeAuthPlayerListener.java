@@ -84,6 +84,9 @@ public class MixedModeAuthPlayerListener extends PlayerListener {
   }
 
   public void onPlayerJoin(PlayerJoinEvent event) {
+	if(event instanceof FakePlayerJoinEvent){
+	  return;
+	}
     Player player = event.getPlayer();
     String name = player.getName();
     Boolean isGood = true;

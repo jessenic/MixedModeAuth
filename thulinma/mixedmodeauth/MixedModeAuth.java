@@ -18,6 +18,8 @@ import java.util.logging.Logger;
 
 import net.minecraft.server.Packet20NamedEntitySpawn;
 import net.minecraft.server.Packet29DestroyEntity;
+import net.minecraft.server.Packet70Bed;
+import net.minecraft.server.Packet9Respawn;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -332,10 +334,19 @@ public class MixedModeAuth extends JavaPlugin {
   }
 
   public void renameUser(Player p, String reName){
+    this.getServer().getPluginManager().callEvent(new FakePlayerQuitEvent(p, null));
     ((CraftPlayer)p).getHandle().name = reName;
     p.setDisplayName(reName);
     p.setPlayerListName(reName);
     p.recalculatePermissions();
+    Packet9Respawn p9 = new Packet9Respawn();
+    p9.a = p.getWorld().getSeed();
+    p9.b = p.getWorld().getEnvironment().getId();
+    p9.c = p.getWorld().getDifficulty().getValue();
+    p9.d = p.getWorld().getMaxHeight();
+    p9.e = p.getGameMode().getValue();
+    ((CraftPlayer) p).getHandle().netServerHandler.sendPacket(p9);
+    ((CraftPlayer) p).getHandle().netServerHandler.sendPacket(new Packet70Bed(3, p.getGameMode().getValue()));
     Location loc = p.getLocation();
     Packet20NamedEntitySpawn p20 = new Packet20NamedEntitySpawn();
     p20.a = p.getEntityId();
@@ -353,6 +364,7 @@ public class MixedModeAuth extends JavaPlugin {
       ((CraftPlayer) p1).getHandle().netServerHandler.sendPacket(p29);
       ((CraftPlayer) p1).getHandle().netServerHandler.sendPacket(p20);
     }
+	  this.getServer().getPluginManager().callEvent(new FakePlayerJoinEvent(p, reName+" logged on through /auth"));
   }
   
   public void sendMess(CommandSender to, String mess) {
